@@ -41,6 +41,7 @@ export class EStatClient {
     cdCat01To?: string;
     lvCat02?: string;
     cdCat02?: string;
+    cdCat03?: string;
     startPosition?: number;
     limit?: number;
     metaGetFlg?: string;

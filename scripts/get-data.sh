@@ -21,18 +21,45 @@ fi
 STATS_DATA_ID="$1"; shift
 
 LIMIT="100" START="" RAW=false FILTER_PARAMS=""
+
+require_option_value() {
+  local opt="$1"
+  local val="${2-}"
+  if [ -z "$val" ] || [[ "$val" == -* ]]; then
+    echo "Option ${opt} requires a value." >&2
+    exit 1
+  fi
+}
+
+append_filter_param() {
+  local key="$1"
+  local value="$2"
+  FILTER_PARAMS="${FILTER_PARAMS}&${key}=$(urlencode "$value")"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -l|--limit) LIMIT="$2"; shift 2 ;;
-    -s|--start) START="$2"; shift 2 ;;
+    -l|--limit)
+      require_option_value "$1" "${2-}"
+      LIMIT="$2"; shift 2 ;;
+    -s|--start)
+      require_option_value "$1" "${2-}"
+      START="$2"; shift 2 ;;
     --cdTab|--cdCat01|--cdCat02|--cdCat03|--cdArea|--cdTime)
-      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
+      require_option_value "$1" "${2-}"
+      append_filter_param "${1#--}" "$2"; shift 2 ;;
     --cdTimeFrom|--cdTimeTo|--cdAreaFrom|--cdAreaTo|--cdCat01From|--cdCat01To)
-      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
+      require_option_value "$1" "${2-}"
+      append_filter_param "${1#--}" "$2"; shift 2 ;;
     --lvTab|--lvTime|--lvArea|--lvCat01|--lvCat02)
-      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
-    --lang) FILTER_PARAMS="${FILTER_PARAMS}&lang=$2"; shift 2 ;;
-    --metaGetFlg) FILTER_PARAMS="${FILTER_PARAMS}&metaGetFlg=$2"; shift 2 ;;
+      require_option_value "$1" "${2-}"
+      append_filter_param "${1#--}" "$2"; shift 2 ;;
+    --lang)
+      require_option_value "$1" "${2-}"
+      append_filter_param "lang" "$2"; shift 2 ;;
+    --metaGetFlg)
+      require_option_value "$1" "${2-}"
+      append_filter_param "metaGetFlg" "$2"; shift 2 ;;
     --raw) RAW=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

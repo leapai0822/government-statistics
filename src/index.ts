@@ -71,6 +71,7 @@ app.get("/api/stats/data/:statsDataId", async (c) => {
       cdCat01To: query.cdCat01To,
       lvCat02: query.lvCat02,
       cdCat02: query.cdCat02,
+      cdCat03: query.cdCat03,
       startPosition: query.startPosition
         ? Number(query.startPosition)
         : undefined,
