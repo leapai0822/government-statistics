@@ -1,0 +1,7 @@
+name = "leapai-government-statistics"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secret: ESTAT_APP_ID
+# Set via: npx wrangler secret put ESTAT_APP_ID
