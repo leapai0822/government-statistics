@@ -17,7 +17,9 @@ API_MODE="${API_MODE:-local}"
 ESTAT_BASE_URL="https://api.e-stat.go.jp/rest/3.0/app/json"
 ESTAT_APP_ID="${ESTAT_APP_ID:-YOUR_APP_ID_HERE}"
 
+# Remove trailing slash from WORKER_URL
 WORKER_URL="${WORKER_URL:-http://localhost:8787}"
+WORKER_URL="${WORKER_URL%/}"
 
 validate_app_id() {
   if [ "$API_MODE" = "local" ] && [ "$ESTAT_APP_ID" = "YOUR_APP_ID_HERE" ]; then

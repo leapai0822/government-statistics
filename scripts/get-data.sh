@@ -20,17 +20,19 @@ if [ -z "${1:-}" ]; then
 fi
 STATS_DATA_ID="$1"; shift
 
-LIMIT="100" START="" RAW=false
-declare -A FILTERS=()
+LIMIT="100" START="" RAW=false FILTER_PARAMS=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -l|--limit) LIMIT="$2"; shift 2 ;;
     -s|--start) START="$2"; shift 2 ;;
-    --cdTab|--cdCat01|--cdCat02|--cdCat03|--cdArea|--cdTime) FILTERS["${1#--}"]="$2"; shift 2 ;;
+    --cdTab|--cdCat01|--cdCat02|--cdCat03|--cdArea|--cdTime)
+      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
     --cdTimeFrom|--cdTimeTo|--cdAreaFrom|--cdAreaTo|--cdCat01From|--cdCat01To)
-      FILTERS["${1#--}"]="$2"; shift 2 ;;
-    --lvTab|--lvTime|--lvArea|--lvCat01|--lvCat02) FILTERS["${1#--}"]="$2"; shift 2 ;;
-    --lang) FILTERS["lang"]="$2"; shift 2 ;;
+      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
+    --lvTab|--lvTime|--lvArea|--lvCat01|--lvCat02)
+      FILTER_PARAMS="${FILTER_PARAMS}&${1#--}=$2"; shift 2 ;;
+    --lang) FILTER_PARAMS="${FILTER_PARAMS}&lang=$2"; shift 2 ;;
+    --metaGetFlg) FILTER_PARAMS="${FILTER_PARAMS}&metaGetFlg=$2"; shift 2 ;;
     --raw) RAW=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -38,9 +40,7 @@ done
 
 PARAMS="limit=${LIMIT}"
 [ -n "$START" ] && PARAMS="${PARAMS}&startPosition=${START}"
-for key in "${!FILTERS[@]}"; do
-  PARAMS="${PARAMS}&${key}=${FILTERS[$key]}"
-done
+PARAMS="${PARAMS}${FILTER_PARAMS}"
 
 if [ "$API_MODE" = "worker" ]; then
   RESULT=$(estat_request "data/${STATS_DATA_ID}" "$PARAMS")
