@@ -1,66 +1,80 @@
 # Government Statistics Query System (e-Stat API)
 
 日本の政府統計データをe-Stat APIから取得するシステム。
-ユーザーの質問に対して、シェルスクリプトを実行してデータを取得・回答する。
+ユーザーの質問に対して、Worker APIにcurlでリクエストしてデータを取得・回答する。
 
-## スクリプト一覧
+## Worker API (必ずこのURLを使うこと)
 
-すべてプロジェクトルートから実行する。
+**Base URL:** `https://leapai-government-statistics.leapai0822.workers.dev`
 
-### 1. 統計表検索
+### エンドポイント
+
+#### 1. 統計表検索
 ```bash
-./scripts/search-stats.sh -k "キーワード" [-f フィールドコード] [-y 年] [-l 件数]
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/search?searchWord=キーワード&statsField=分野コード&limit=10"
 ```
-- `-k` keyword: 検索キーワード（日本語OK）。AND/OR/NOT演算子対応
-- `-f` field: 統計分野コード（下記参照）
-- `-y` year: 調査年 (yyyy) またはレンジ (yyyymm-yyyymm)
-- `-l` limit: 最大件数 (デフォルト10)
-- `-a` area: 1=全国, 2=都道府県, 3=市区町村
+主なパラメータ:
+- `searchWord` (URLエンコード必須): 検索キーワード。AND/OR/NOT演算子対応
+- `statsField`: 統計分野コード（下記参照）
+- `surveyYears`: 調査年 (yyyy) またはレンジ (yyyymm-yyyymm)
+- `limit`: 最大件数 (デフォルト10)
+- `collectArea`: 1=全国, 2=都道府県, 3=市区町村
 
-### 2. メタデータ取得（次元・カテゴリ確認）
+#### 2. メタデータ取得（次元・カテゴリ確認）
 ```bash
-./scripts/get-meta.sh <statsDataId>
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/meta/{statsDataId}"
 ```
 検索結果のテーブルIDを指定。利用可能な次元（時間, 地域, カテゴリ）とコードを表示。
 
-### 3. 統計データ取得
+#### 3. 統計データ取得
 ```bash
-./scripts/get-data.sh <statsDataId> [-l 件数] [--cdTime コード] [--cdArea コード] ...
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/data/{statsDataId}?limit=100&metaGetFlg=Y"
 ```
-- `--cdTime`: 時間コードでフィルタ（メタデータから取得）
-- `--cdTimeFrom`/`--cdTimeTo`: 時間レンジ
-- `--cdArea`: 地域コードでフィルタ
-- `--cdCat01`: カテゴリ01コードでフィルタ
-- `--lvArea`: 地域レベル（例: 2=都道府県）
-- `--raw`: 生のJSON出力
-- `-l` limit: 最大行数 (デフォルト100)
+主なパラメータ:
+- `limit`: 最大行数 (デフォルト100)
+- `metaGetFlg=Y`: レスポンスにメタデータ（コード→名前の対応）を含める。**常に付けること**
+- `cdTime`: 時間コードでフィルタ
+- `cdTimeFrom`/`cdTimeTo`: 時間レンジ
+- `cdArea`: 地域コードでフィルタ
+- `cdCat01`: カテゴリ01コードでフィルタ
+- `cdCat02`, `cdCat03`: カテゴリ02, 03コードでフィルタ
+- `lvArea`: 地域レベル（例: 2=都道府県）
+- `startPosition`: ページネーション用の開始位置
 
-### 4. データカタログ検索
+#### 4. データカタログ検索
 ```bash
-./scripts/get-catalog.sh -k "キーワード" [-t データタイプ]
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/catalog?searchWord=キーワード&limit=10"
 ```
 
 ## 質問への回答ワークフロー
 
-ユーザーが統計に関する質問をしたら、以下の手順で回答する：
+ユーザーが統計に関する質問をしたら、以下の手順でcurlを使って回答する：
 
 1. **トピック特定** - 統計分野コードとキーワードを決定
-2. **検索** - `./scripts/search-stats.sh -k "keyword" -f <field_code>`
-3. **メタデータ確認** - `./scripts/get-meta.sh <statsDataId>` で次元を把握
-4. **データ取得** - `./scripts/get-data.sh <statsDataId> [filters]` で実データ取得
-5. **回答作成** - データを読みやすく要約して回答
+2. **検索** - `/api/stats/search` で関連テーブルを検索
+3. **メタデータ確認** - `/api/stats/meta/{id}` で次元・カテゴリコードを把握
+4. **データ取得** - `/api/stats/data/{id}` でフィルタ付きでデータ取得
+5. **回答作成** - jqでデータを解析し、読みやすく要約して回答
 
-### 例: 「日本の人口は？」
+### 例: 「日本のミャンマー人人口は？」
 ```bash
-# Step 1: 人口統計を検索
-./scripts/search-stats.sh -k "人口" -f 02 -l 5
+# Step 1: 国籍詳細の人口テーブルを検索
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/search?searchWord=%E5%9B%BD%E7%B1%8D%20%E8%A9%B3%E7%B4%B0%20%E5%A4%96%E5%9B%BD%E4%BA%BA&statsField=02&limit=5" | jq -r '.GET_STATS_LIST.DATALIST_INF.TABLE_INF | if type == "object" then [.] else . end | .[] | "[\(.["@id"])] \(.TITLE["$"] // .TITLE) (Survey: \(.SURVEY_DATE))"'
 
-# Step 2: 関連テーブルのメタデータ確認
-./scripts/get-meta.sh 0003448237
+# Step 2: メタデータでカテゴリコードを確認（ミャンマーのコードを探す）
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/meta/0003445257" | jq -r '.GET_META_INFO.METADATA_INF.CLASS_INF.CLASS_OBJ | if type == "object" then [.] else . end | .[] | select(.["@id"] == "cat01") | .CLASS | if type == "object" then [.] else . end | .[] | select(.["@name"] | test("ミャンマー")) | "\(.["@code"]): \(.["@name"])"'
 
-# Step 3: データ取得
-./scripts/get-data.sh 0003448237 -l 50
+# Step 3: ミャンマー(code=1140)でフィルタしてデータ取得
+curl -s "https://leapai-government-statistics.leapai0822.workers.dev/api/stats/data/0003445257?cdCat01=1140&limit=10&metaGetFlg=Y" | jq -r '.GET_STATS_DATA.STATISTICAL_DATA | (reduce ((.CLASS_INF.CLASS_OBJ // []) | if type == "object" then [.] else . end | .[] | . as $obj | ((.CLASS // []) | if type == "object" then [.] else . end | .[]) | { key: ($obj["@id"] + ":" + .["@code"]), value: .["@name"] }) as $entry ({}; . + { ($entry.key): $entry.value })) as $lookup | (.DATA_INF.VALUE // []) | if type == "object" then [.] else . end | .[] | ($lookup["cat01:" + .["@cat01"]] // "") + " | " + ($lookup["cat02:" + .["@cat02"]] // "") + " | " + ($lookup["time:" + .["@time"]] // "") + " => " + .["$"] + " 人"'
 ```
+
+## レスポンスの読み方
+
+e-Stat APIのJSONレスポンスには以下の構造がある：
+- `RESULT.STATUS`: 0=成功, 1=データなし, 100以上=エラー
+- `CLASS_INF.CLASS_OBJ`: 次元の定義（コード→名前のマッピング）
+- `DATA_INF.VALUE`: 実データの配列。`@tab`, `@cat01`, `@cat02`, `@area`, `@time` などのコードと `$` に値が入る
+- 単一レコードの場合、配列ではなくオブジェクトで返る場合がある。`if type == "object" then [.] else . end` で統一すること
 
 ## 統計分野コード
 | コード | 分野 |
@@ -92,14 +106,8 @@
 - 教育: 学校, 教育, 学生数
 - 医療: 医療, 病院, 健康, 平均寿命
 
-## 設定
-- `.env`の`ESTAT_APP_ID`にアプリケーションIDを設定
-- `API_MODE=local`: e-Stat APIを直接呼び出し（APP_IDが必要）
-- `API_MODE=worker`: Cloudflare Worker経由で呼び出し
-- Workerデプロイ後は`WORKER_URL`を本番URLに変更
-
 ## トラブルシューティング
-- "Authentication failure": ESTAT_APP_IDを確認
-- 結果が空: キーワードを広げるか別の分野コードを試す
-- 大量データ: `--start`と`--limit`でページネーション
+- STATUS 100 "認証に失敗しました": Worker側のESTAT_APP_IDシークレットを確認
+- STATUS 1 "該当データなし": キーワードを広げるか別の分野コードを試す
+- 大量データ: `startPosition`と`limit`でページネーション
 - e-Stat APIの上限: 1リクエスト最大100,000行
